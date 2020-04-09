@@ -3,7 +3,8 @@ var path = require('path');
 var wawoff = require('wawoff2');
 var convertLib = require('./convertLib');
 
-function convertFont(dirIn, dirOut, arrayConvert) {
+
+function convertFont(dirIn, dirOut, arrayConvert, retainFilename = false) {
     var dir,
         input = [],
         ttfArr = [],
@@ -14,7 +15,7 @@ function convertFont(dirIn, dirOut, arrayConvert) {
         rName = [],
         formatConvert = ['ttf', 'svg', 'eot', 'woff'],
         nameFont = [];
-        
+
     if (!dirOut) {
         dirOut = dirIn;
     } else {
@@ -31,14 +32,28 @@ function convertFont(dirIn, dirOut, arrayConvert) {
     }
 
     try {
-        dir = fs.readdirSync(dirIn);
+
+        if (fs.lstatSync(dirIn).isDirectory())
+        {
+            var files = fs.readdirSync(dirIn);
+
+            files.forEach(function(a, _b){
+                dir.push(path.join(dirIn, a));
+            })
+        }
+        else
+        {
+            dir = [dirIn];
+        }
+
+        dirIn = path.dirname(dirIn);
 
         dir.forEach(function (a, _b) {
-            if (fs.lstatSync(path.join(dirIn, a)).isFile()) {
+            if (fs.lstatSync(a).isFile()) {
                 var format = a.split('.')[1];
                 if (format === 'ttf' || format === 'otf') {
-                    nameFont[_b] = a.split('.')[0];
-                    ttfArr[_b] = path.join(dirIn, a);
+                    nameFont[_b] = path.basename(a, path.extname(a));
+                    ttfArr[_b] = a;
                 }
             }
         })
@@ -68,10 +83,10 @@ function convertFont(dirIn, dirOut, arrayConvert) {
             var svg = convFont.renderByTmpl();
         }
 
-        var ttfFontWeight = convFont.meta['Font subfamily'];
+        var ttfFontWeight = convFont.meta['Font subfamily'] || '';
         var ttfFontFamily = convFont.meta['Font family'];
         var ttfFullName = convFont.meta['Full name'];
-        var ttfFontName = convFont.meta['Postscript name'];
+        var ttfFontName = retainFilename ? nameFont[_b] : convFont.meta['Postscript name'];
         var ttfPostscriptName = convFont.meta['Postscript name'];
 
         if (ttfFontWeight.indexOf('Thin') != -1 || ttfFontWeight.indexOf('Hairline') != -1) {
@@ -134,38 +149,32 @@ function convertFont(dirIn, dirOut, arrayConvert) {
 
         if (formatConvert.indexOf('woff2') != -1) {
             var woff21 = `\n         url('${ttfFontName}.woff2') format('woff2'),`;
-            r[_b] = wawoff.compress(a);
+
+            r[_b] =  wawoff.compress(a);
             rName[_b] = ttfFontName;
+
         } else {
             var woff21 = '';
         }
 
-        var arrayFont = [eot2, woff21, wofff, ttf1, svg1];
-        arrayFont = arrayFont.filter(Boolean);
-        arrayFont[arrayFont.length - 1] = arrayFont[arrayFont.length - 1].slice(0, -1) + ';';
-        arrayFont = arrayFont.join('');
-
-        cssTeamplatesOut[_b] = `@font-face {
-    font-family: '${ttfFontFamily}';${eot1}        
-    src: local('${ttfFontFamily+' '+ttfFontWeight}'),
-         local('${ttfPostscriptName}'),${arrayFont}
-    font-weight: ${weight};
-    font-style: ${style};
-}
-`;
-
     });
-    fs.writeFileSync(path.join(dirOut, 'font.css'), cssTeamplatesOut.join('\n'));
 
-    if (formatConvert.indexOf('woff2') != -1) {
-        Promise.all(r).then(r => {
-            r.forEach(function (a, _b) {
-                fs.writeFileSync(path.join(dirOut, rName[_b] + '.woff2'), new Buffer(a));
+    return new Promise((resolve, reject) => {
+        if (formatConvert.indexOf('woff2') != -1) {
+            Promise.all(r).then(r => {
+                r.forEach(function (a, _b) {
+                    if (!a) return;
+                    fs.writeFileSync(path.join(dirOut, rName[_b] + '.woff2'), new Buffer(a));
+                })
+
+                resolve(true);
             })
-        })
-    }
-
-    return true;
+        }
+        else
+        {
+            resolve(true);
+        }
+    });
 }
 
 module.exports = convertFont;
