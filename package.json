@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "homepage": "https://github.com/voidbridge/converter-webfont",
   "description": "convert ttf fonts to other types",
-  "main": index.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
